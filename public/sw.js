@@ -13,3 +13,10 @@ self.addEventListener("fetch", event => {
   }
   if (url.pathname.startsWith("/_next/static/")) event.respondWith(caches.match(request).then(hit => hit || fetch(request).then(response => { if (response.ok) caches.open(CACHE).then(cache => cache.put(request, response.clone())); return response; })));
 });
+self.addEventListener("notificationclick", event => {
+  event.notification.close();
+  event.waitUntil(self.clients.matchAll({ type: "window", includeUncontrolled: true }).then(clients => {
+    const open = clients.find(client => "focus" in client);
+    return open ? open.focus() : self.clients.openWindow("/");
+  }));
+});

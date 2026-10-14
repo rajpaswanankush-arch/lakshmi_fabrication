@@ -6,10 +6,10 @@ export type Attendance = { id: string; workerId: string; date: string; regularHo
 export type Ledger = { id: string; date: string; kind: "Receipt" | "Labour payment" | "Advance" | "Project expense" | "Equipment" | "Family transfer" | "Personal"; description: string; amount: number; contractId?: string; workerId?: string; equipmentId?: string; approvedBy?: string };
 export type WageApproval = { id: string; workerId: string; previousType: Worker["wageType"]; previousAmount: number; newType: Worker["wageType"]; newAmount: number; reason: string; approvedBy: string; approvedAt: string };
 export type AuditEntry = { id: string; actor: string; action: "added"|"updated"|"restored"; recordType: string; recordId: string; occurredAt: string };
-export type AppData = { version: 1; workers: Worker[]; contracts: Contract[]; equipment: EquipmentItem[]; maintenance: MaintenanceRecord[]; attendance: Attendance[]; ledger: Ledger[]; wageHistory: WageApproval[]; auditTrail: AuditEntry[]; overtimeCarry: Record<string, number>; updatedAt: string };
+export type AppData = { version: 1; brandLogo?: string; monthlyWageReminderDay?: number; workers: Worker[]; contracts: Contract[]; equipment: EquipmentItem[]; maintenance: MaintenanceRecord[]; attendance: Attendance[]; ledger: Ledger[]; wageHistory: WageApproval[]; auditTrail: AuditEntry[]; overtimeCarry: Record<string, number>; updatedAt: string };
 export const STORAGE_KEY = "lakshmi-fabrication-v1";
 export const today = () => { const d=new Date(); return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`; };
-export const initialData: AppData = { version: 1, updatedAt: new Date().toISOString(), workers: [], contracts: [], equipment: [], maintenance: [], attendance: [], ledger: [], wageHistory: [], auditTrail: [], overtimeCarry: {} };
+export const initialData: AppData = { version: 1, monthlyWageReminderDay: 1, updatedAt: new Date().toISOString(), workers: [], contracts: [], equipment: [], maintenance: [], attendance: [], ledger: [], wageHistory: [], auditTrail: [], overtimeCarry: {} };
 export function loadData(): AppData {
   if (typeof window === "undefined") return initialData;
   try { const raw = localStorage.getItem(STORAGE_KEY); if (raw) return validateBackup(JSON.parse(raw)); } catch { /* use the starter workspace until a valid local copy is available */ }
@@ -20,6 +20,8 @@ export function validateBackup(input: unknown): AppData {
   if (!input || typeof input !== "object") throw new Error("This file is not a Lakshmi Fabrication backup.");
   const x = input as Partial<AppData>;
   if (x.version !== 1 || !Array.isArray(x.workers) || !Array.isArray(x.contracts) || !Array.isArray(x.attendance) || !Array.isArray(x.ledger) || !x.overtimeCarry || typeof x.overtimeCarry !== "object") throw new Error("Backup validation failed. No records were changed.");
+  if (x.brandLogo !== undefined && (typeof x.brandLogo !== "string" || !/^data:image\/(jpeg|png|webp);base64,/.test(x.brandLogo) || x.brandLogo.length > 30000)) throw new Error("Backup contains an invalid company logo. No records were changed.");
+  if (x.monthlyWageReminderDay !== undefined && (!Number.isInteger(x.monthlyWageReminderDay) || x.monthlyWageReminderDay < 1 || x.monthlyWageReminderDay > 28)) throw new Error("Backup contains an invalid monthly wage reminder day. No records were changed.");
   if (!Array.isArray(x.equipment)) x.equipment=[];
   if (!Array.isArray(x.maintenance)) x.maintenance=[];
   if (!Array.isArray(x.wageHistory)) x.wageHistory = [];
@@ -70,4 +72,10 @@ export function payrollSummary(data: AppData, month: string) {
   const contractPaid = data.ledger.filter(l=>l.workerId&&contractIds.has(l.workerId)&&(l.kind==="Labour payment"||l.kind==="Advance")).reduce((s,l)=>s+l.amount,0);
   const earned = fixedMonthly + dailyEarned;
   return { fixedMonthly, dailyEarned, contractAgreed, paid, earned, outstanding: Math.max(0,earned-paid)+Math.max(0,contractAgreed-contractPaid) };
+}
+export function unpaidMonthlyWages(data: AppData, month: string) {
+  return data.workers.filter(w => w.wageType === "Monthly" && w.monthlyWage > 0).map(worker => {
+    const paid = data.ledger.filter(entry => entry.kind === "Labour payment" && entry.workerId === worker.id && entry.date.startsWith(month)).reduce((sum, entry) => sum + entry.amount, 0);
+    return { worker, paid, remaining: Math.max(0, worker.monthlyWage - paid) };
+  }).filter(item => item.remaining > 0);
 }
