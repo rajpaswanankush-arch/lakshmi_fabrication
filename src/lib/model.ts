@@ -3,10 +3,11 @@ export type Contract = { id: string; company: string; title: string; location: s
 export type Attendance = { id: string; workerId: string; date: string; regularHours: number; overtimeHours: number; status: "P" | "A"; approvedBy: string };
 export type Ledger = { id: string; date: string; kind: "Receipt" | "Labour payment" | "Advance" | "Project expense" | "Equipment" | "Family transfer" | "Personal"; description: string; amount: number; contractId?: string; workerId?: string; approvedBy?: string };
 export type WageApproval = { id: string; workerId: string; previousType: Worker["wageType"]; previousAmount: number; newType: Worker["wageType"]; newAmount: number; reason: string; approvedBy: string; approvedAt: string };
-export type AppData = { version: 1; workers: Worker[]; contracts: Contract[]; attendance: Attendance[]; ledger: Ledger[]; wageHistory: WageApproval[]; overtimeCarry: Record<string, number>; updatedAt: string };
+export type AuditEntry = { id: string; actor: string; action: "added"|"updated"|"restored"; recordType: string; recordId: string; occurredAt: string };
+export type AppData = { version: 1; workers: Worker[]; contracts: Contract[]; attendance: Attendance[]; ledger: Ledger[]; wageHistory: WageApproval[]; auditTrail: AuditEntry[]; overtimeCarry: Record<string, number>; updatedAt: string };
 export const STORAGE_KEY = "lakshmi-fabrication-v1";
-export const today = () => new Date().toISOString().slice(0, 10);
-export const initialData: AppData = { version: 1, updatedAt: new Date().toISOString(), workers: [], contracts: [], attendance: [], ledger: [], wageHistory: [], overtimeCarry: {} };
+export const today = () => { const d=new Date(); return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`; };
+export const initialData: AppData = { version: 1, updatedAt: new Date().toISOString(), workers: [], contracts: [], attendance: [], ledger: [], wageHistory: [], auditTrail: [], overtimeCarry: {} };
 export function loadData(): AppData {
   if (typeof window === "undefined") return initialData;
   try { const raw = localStorage.getItem(STORAGE_KEY); if (raw) return validateBackup(JSON.parse(raw)); } catch { /* use the starter workspace until a valid local copy is available */ }
@@ -18,6 +19,7 @@ export function validateBackup(input: unknown): AppData {
   const x = input as Partial<AppData>;
   if (x.version !== 1 || !Array.isArray(x.workers) || !Array.isArray(x.contracts) || !Array.isArray(x.attendance) || !Array.isArray(x.ledger) || !x.overtimeCarry || typeof x.overtimeCarry !== "object") throw new Error("Backup validation failed. No records were changed.");
   if (!Array.isArray(x.wageHistory)) x.wageHistory = [];
+  if (!Array.isArray(x.auditTrail)) x.auditTrail = [];
   const ids = new Set<string>(); for (const w of x.workers) { if (!/^\d{4}$/.test(w.id) || ids.has(w.id)) throw new Error("Backup contains an invalid or duplicate Labour ID. No records were changed."); ids.add(w.id); }
   const workerIds = new Set(x.workers.map(w => w.id)); const contractIds = new Set<string>();
   for (const w of x.workers) if (!w.name?.trim() || !["Labour","Mistri"].includes(w.role) || !["Active","Inactive","Archived"].includes(w.status) || !["Monthly","Daily","Contract"].includes(w.wageType) || [w.monthlyWage,w.dailyWage,w.contractWage??0].some(v=>!Number.isFinite(v)||v<0)) throw new Error("Backup contains an invalid worker or wage agreement. No records were changed.");
@@ -25,9 +27,11 @@ export function validateBackup(input: unknown): AppData {
   const attendanceKeys = new Set<string>();
   for (const a of x.attendance) { const k=`${a.workerId}:${a.date}`; if(!workerIds.has(a.workerId)||attendanceKeys.has(k)||!/^\d{4}-\d{2}-\d{2}$/.test(a.date)||!(["P","A"].includes(a.status))||!Number.isFinite(a.regularHours)||a.regularHours<0||a.regularHours>8||!Number.isFinite(a.overtimeHours)||a.overtimeHours<0||(a.status==="A"&&a.regularHours!==0)||(a.status==="P"&&a.regularHours!==8)) throw new Error("Backup contains invalid or duplicate attendance. No records were changed."); attendanceKeys.add(k); }
   for (const [id,hours] of Object.entries(x.overtimeCarry)) if(!workerIds.has(id)||!Number.isFinite(hours)||hours<0||hours>=8) throw new Error("Backup contains an invalid overtime balance. No records were changed.");
+  for (const id of workerIds) if (Math.abs((x.overtimeCarry[id]??0)-overtimeRemainder(x.attendance,id))>0.01) throw new Error("Backup overtime balances do not match attendance history. No records were changed.");
   const kinds = ["Receipt","Labour payment","Advance","Project expense","Equipment","Family transfer","Personal"];
   for (const e of x.ledger) if (!Number.isFinite(e.amount) || e.amount <= 0 || !kinds.includes(e.kind) || !e.description?.trim() || (e.workerId&&!workerIds.has(e.workerId)) || (e.contractId&&!contractIds.has(e.contractId))) throw new Error("Backup contains an invalid transaction. No records were changed.");
   for (const h of x.wageHistory) if(!workerIds.has(h.workerId)||!Number.isFinite(h.previousAmount)||!Number.isFinite(h.newAmount)||h.previousAmount<0||h.newAmount<0||!h.reason?.trim()) throw new Error("Backup contains an invalid wage approval history. No records were changed.");
+  for (const a of x.auditTrail) if(!a.id||!a.actor||!a.recordType||!a.recordId||!Number.isFinite(Date.parse(a.occurredAt))||!(["added","updated","restored"].includes(a.action))) throw new Error("Backup contains an invalid audit entry. No records were changed.");
   if (!Number.isFinite(Date.parse(x.updatedAt||""))) throw new Error("Backup timestamp is invalid. No records were changed.");
   return x as AppData;
 }
@@ -42,9 +46,10 @@ export function overtimeRemainder(rows: Attendance[], workerId: string) {
   return Math.round((hours % 8) * 100) / 100;
 }
 export function payrollSummary(data: AppData, month: string) {
-  let fixedMonthly = 0, dailyEarned = 0;
+  let fixedMonthly = 0, dailyEarned = 0, contractAgreed = 0;
   for (const worker of data.workers.filter(w => w.status !== "Archived")) {
     if (worker.wageType === "Monthly") fixedMonthly += worker.monthlyWage;
+    if (worker.wageType === "Contract") contractAgreed += worker.contractWage || 0;
     if (worker.wageType !== "Daily") continue;
     const earlier = data.attendance.filter(a => a.workerId === worker.id && a.date.slice(0,7) < month).reduce((s,a)=>s+a.overtimeHours,0);
     let carry = earlier % 8;
@@ -53,7 +58,9 @@ export function payrollSummary(data: AppData, month: string) {
       carry = (carry + row.overtimeHours) % 8;
     }
   }
-  const paid = data.ledger.filter(l => l.date.slice(0,7)===month && l.workerId && (l.kind === "Labour payment" || l.kind === "Advance")).reduce((s,l)=>s+l.amount,0);
+  const contractIds = new Set(data.workers.filter(w=>w.status!=="Archived"&&w.wageType==="Contract").map(w=>w.id));
+  const paid = data.ledger.filter(l => l.date.slice(0,7)===month && l.workerId && !contractIds.has(l.workerId) && (l.kind === "Labour payment" || l.kind === "Advance")).reduce((s,l)=>s+l.amount,0);
+  const contractPaid = data.ledger.filter(l=>l.workerId&&contractIds.has(l.workerId)&&(l.kind==="Labour payment"||l.kind==="Advance")).reduce((s,l)=>s+l.amount,0);
   const earned = fixedMonthly + dailyEarned;
-  return { fixedMonthly, dailyEarned, paid, earned, outstanding: Math.max(0,earned-paid) };
+  return { fixedMonthly, dailyEarned, contractAgreed, paid, earned, outstanding: Math.max(0,earned-paid)+Math.max(0,contractAgreed-contractPaid) };
 }

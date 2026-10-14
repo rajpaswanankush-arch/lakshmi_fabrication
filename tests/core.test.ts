@@ -31,11 +31,17 @@ test("daily payroll carries overtime across days before calculating its equivale
 });
 
 test("backup is validated and round trips all records", async () => {
-  const data = { ...initialData, workers:[{ id:"1001",name:"Example Worker",phone:"",role:"Labour" as const,status:"Active" as const,wageType:"Monthly" as const,monthlyWage:18000,dailyWage:0 }], overtimeCarry:{"1001":3.5} };
+  const data = { ...initialData, workers:[{ id:"1001",name:"Example Worker",phone:"",role:"Labour" as const,status:"Active" as const,wageType:"Monthly" as const,monthlyWage:18000,dailyWage:0 }], attendance:[{id:"a1",workerId:"1001",date:"2026-10-14",regularHours:8,overtimeHours:3.5,status:"P" as const,approvedBy:"Father"}], overtimeCarry:{"1001":3.5} };
   const text = await createBackup(data);
   const restored = await readBackup(text);
   assert.deepEqual(restored.workers, data.workers);
   assert.equal(restored.overtimeCarry["1001"], 3.5);
+});
+
+test("backup rejects overtime carry that disagrees with saved attendance", async () => {
+  const data={...initialData,workers:[{id:"1001",name:"Example Worker",phone:"",role:"Labour" as const,status:"Active" as const,wageType:"Monthly" as const,monthlyWage:18000,dailyWage:0}],attendance:[{id:"a1",workerId:"1001",date:"2026-10-14",regularHours:8,overtimeHours:3,status:"P" as const,approvedBy:"Father"}],overtimeCarry:{"1001":2}};
+  const text=await createBackup(data);
+  await assert.rejects(()=>readBackup(text),/balances do not match attendance/i);
 });
 
 test("tampered backup fails before restore", async () => {

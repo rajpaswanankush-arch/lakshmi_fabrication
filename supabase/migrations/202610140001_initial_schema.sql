@@ -39,7 +39,8 @@ begin
   if jsonb_typeof(next_snapshot) is distinct from 'object' or next_snapshot->>'version' is distinct from '1'
      or jsonb_typeof(next_snapshot->'workers') is distinct from 'array' or jsonb_typeof(next_snapshot->'contracts') is distinct from 'array'
      or jsonb_typeof(next_snapshot->'attendance') is distinct from 'array' or jsonb_typeof(next_snapshot->'ledger') is distinct from 'array'
-     or jsonb_typeof(next_snapshot->'overtimeCarry') is distinct from 'object' then raise exception 'Invalid workspace snapshot'; end if;
+     or jsonb_typeof(next_snapshot->'overtimeCarry') is distinct from 'object'
+     or jsonb_typeof(next_snapshot->'auditTrail') is distinct from 'array' then raise exception 'Invalid workspace snapshot'; end if;
   select * into v_row from public.workspace_snapshots where user_id=v_user for update;
   if not found then
     if expected_revision is not null then return jsonb_build_object('status','conflict'); end if;
@@ -50,6 +51,9 @@ begin
       select * into v_row from public.workspace_snapshots where user_id=v_user;
       return jsonb_build_object('status','conflict','revision',v_row.revision,'snapshot',v_row.snapshot,'updated_at',v_row.updated_at);
     end if;
+    insert into public.audit_log(table_name,record_key,action,actor_id,source_event_id)
+      select 'workspace', e->>'recordId', case when e->>'action'='added' then 'INSERT' else 'UPDATE' end, v_user, (e->>'id')::uuid
+      from jsonb_array_elements(next_snapshot->'auditTrail') e on conflict (source_event_id) do nothing;
     return jsonb_build_object('status','saved','revision',v_revision,'snapshot',next_snapshot,'updated_at',now());
   end if;
   if expected_revision is null or expected_revision <> v_row.revision then
@@ -57,6 +61,9 @@ begin
   end if;
   v_revision := gen_random_uuid();
   update public.workspace_snapshots set revision=v_revision,snapshot=next_snapshot,updated_at=now() where user_id=v_user;
+  insert into public.audit_log(table_name,record_key,action,actor_id,source_event_id)
+    select 'workspace', e->>'recordId', case when e->>'action'='added' then 'INSERT' else 'UPDATE' end, v_user, (e->>'id')::uuid
+    from jsonb_array_elements(next_snapshot->'auditTrail') e on conflict (source_event_id) do nothing;
   return jsonb_build_object('status','saved','revision',v_revision,'snapshot',next_snapshot,'updated_at',now());
 end $$;
 revoke all on function public.sync_workspace_snapshot(uuid,jsonb) from public;
@@ -140,7 +147,6 @@ create table if not exists public.workers (
   full_name text not null,
   phone text not null default '',
   worker_type text not null check (worker_type in ('labour','mistri')),
-  photo_path text,
   lifecycle text not null default 'active' check (lifecycle in ('active','inactive','archived')),
   joined_on date not null default current_date,
   archived_at timestamptz,
@@ -238,6 +244,7 @@ create table if not exists public.audit_log (
   before_data jsonb,
   after_data jsonb,
   actor_id uuid default auth.uid() references auth.users(id),
+  source_event_id uuid unique,
   occurred_at timestamptz not null default now()
 );
 create or replace function public.capture_audit_log()
@@ -254,11 +261,13 @@ end $$;
 revoke all on function public.capture_audit_log() from public;
 
 do $$ declare t text; begin
-  foreach t in array array['companies','work_locations','contracts','contract_receipts','equipment','equipment_maintenance','wage_agreements','wage_adjustments','overtime_carry','worker_contract_assignments','ledger_entries'] loop
+  foreach t in array array['companies','work_locations','contracts','contract_receipts','equipment','equipment_maintenance','wage_agreements','wage_adjustments','worker_contract_assignments','ledger_entries'] loop
     execute format('drop trigger if exists %I_audit on public.%I',t,t);
     execute format('create trigger %I_audit after insert or update or delete on public.%I for each row execute function public.capture_audit_log(''id'')',t,t);
   end loop;
 end $$;
+drop trigger if exists overtime_carry_audit on public.overtime_carry;
+create trigger overtime_carry_audit after insert or update or delete on public.overtime_carry for each row execute function public.capture_audit_log('labour_id');
 drop trigger if exists workers_audit on public.workers;
 create trigger workers_audit after insert or update or delete on public.workers for each row execute function public.capture_audit_log('labour_id');
 drop trigger if exists attendance_audit on public.attendance;
@@ -285,11 +294,3 @@ grant select, insert, update, delete on public.user_profiles, public.companies, 
 grant select on public.audit_log to authenticated;
 grant usage, select on sequence public.audit_log_id_seq to authenticated;
 
--- Photos are private; access is limited to signed-in users with an assigned app role.
-insert into storage.buckets (id,name,public,file_size_limit,allowed_mime_types)
-values ('worker-photos','worker-photos',false,5242880,array['image/jpeg','image/png','image/webp'])
-on conflict (id) do nothing;
-drop policy if exists "role can read worker photos" on storage.objects;
-create policy "role can read worker photos" on storage.objects for select to authenticated using (bucket_id='worker-photos' and public.current_app_role() in ('owner','manager','viewer'));
-drop policy if exists "owner can manage worker photos" on storage.objects;
-create policy "owner can manage worker photos" on storage.objects for all to authenticated using (bucket_id='worker-photos' and public.current_app_role()='owner') with check (bucket_id='worker-photos' and public.current_app_role()='owner');
