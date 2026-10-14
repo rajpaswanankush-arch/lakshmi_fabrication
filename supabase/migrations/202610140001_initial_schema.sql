@@ -39,6 +39,7 @@ begin
   if jsonb_typeof(next_snapshot) is distinct from 'object' or next_snapshot->>'version' is distinct from '1'
      or jsonb_typeof(next_snapshot->'workers') is distinct from 'array' or jsonb_typeof(next_snapshot->'contracts') is distinct from 'array'
      or jsonb_typeof(next_snapshot->'attendance') is distinct from 'array' or jsonb_typeof(next_snapshot->'ledger') is distinct from 'array'
+     or jsonb_typeof(next_snapshot->'equipment') is distinct from 'array' or jsonb_typeof(next_snapshot->'maintenance') is distinct from 'array'
      or jsonb_typeof(next_snapshot->'overtimeCarry') is distinct from 'object'
      or jsonb_typeof(next_snapshot->'auditTrail') is distinct from 'array' then raise exception 'Invalid workspace snapshot'; end if;
   select * into v_row from public.workspace_snapshots where user_id=v_user for update;

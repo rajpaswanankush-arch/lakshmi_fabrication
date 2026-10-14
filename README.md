@@ -36,4 +36,4 @@ Configure `NEXT_PUBLIC_SUPABASE_URL` and `NEXT_PUBLIC_SUPABASE_ANON_KEY`. Only t
 - Payroll preview includes the full monthly agreement and daily attendance equivalents, including completed overtime blocks. It never applies an absence deduction.
 - Backup files are capped at 50 MB, include SHA-256 integrity validation, and are fully checked before the restore confirmation can replace local records.
 - The PWA caches only the app shell and Next static assets. API/auth traffic is not cached.
-- Paper/digital record import, item-by-item equipment maintenance screens, multi-device end-to-end browser verification, owner bootstrap, migration application, and deployment are still pending review/setup. Worker photos are locally cropped/compressed and included in the private owner-only snapshot/backup.
+- The item-by-item equipment register and maintenance-cost screen are included. Paper/digital record import, multi-device end-to-end browser verification, owner bootstrap, migration application, and deployment are still pending review/setup. Worker photos are locally cropped/compressed and included in the private owner-only snapshot/backup.
