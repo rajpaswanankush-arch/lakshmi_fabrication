@@ -16,7 +16,7 @@ A minimal Hindi/English workforce, attendance, contract and cashbook app with a 
 
 ## Supabase setup
 
-The initial migration and subsequent owner-only access hardening are in `supabase/migrations/`. They create the workforce, wage, attendance, contract, equipment, ledger and audit tables, owner-only read/write policies, and revision-checked local-first snapshot sync. These additive migrations have been applied to the connected empty Supabase project; no worker, payroll or contract data was added.
+The initial migration and subsequent owner-only access hardening are in `supabase/migrations/`. They create the workforce, wage, attendance, contract, equipment, ledger and audit tables, owner-only read/write policies, and revision-checked local-first snapshot sync. The connected project has these migrations applied; business tables are currently empty. No production records were changed during this work.
 
 Create the first sign-in in Supabase Auth (public sign-up remains disabled), then assign its UUID as owner in SQL Editor:
 
@@ -36,5 +36,7 @@ Configure `NEXT_PUBLIC_SUPABASE_URL` and `NEXT_PUBLIC_SUPABASE_ANON_KEY`. Only t
 - Payroll preview includes the full monthly agreement and daily attendance equivalents, including completed overtime blocks. It never applies an absence deduction.
 - Backup files are capped at 50 MB, include SHA-256 integrity validation, and are fully checked before the restore confirmation can replace local records.
 - The PWA caches only the app shell and Next static assets. API/auth traffic is not cached.
-- Owner settings include company logo editing, password recovery by email, and monthly wage due-day reminders. Browser wage reminders require notification permission and the app to be open or active; background push delivery still needs a scheduled sender and private server keys.
+- Owner settings include company logo editing, password recovery by email, and monthly wage due-day reminders. Logos are resized without cropping, stored in the owner-only workspace snapshot, and covered by its RLS policy and size validation.
+- Worker rows open a detailed profile. Name, phone, role and photo can be edited; wage changes remain on the separate Owner-approved history path. Archive preserves linked records. Permanent deletion requires explicit confirmation and is disabled whenever attendance, payment, wage-history or overtime records depend on the worker.
+- Browser wage reminders require notification permission and the app to be open or active; background push delivery still needs a scheduled sender and private server keys.
 - The item-by-item equipment register and maintenance-cost screen are included. Paper/digital record import, multi-device end-to-end browser verification, creating the first Auth account and assigning its owner role, and deployment are still pending. Worker photos are locally cropped/compressed and included in the private owner-only snapshot/backup.

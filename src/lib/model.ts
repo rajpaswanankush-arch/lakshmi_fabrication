@@ -5,7 +5,7 @@ export type MaintenanceRecord = { id: string; equipmentId: string; date: string;
 export type Attendance = { id: string; workerId: string; date: string; regularHours: number; overtimeHours: number; status: "P" | "A"; approvedBy: string };
 export type Ledger = { id: string; date: string; kind: "Receipt" | "Labour payment" | "Advance" | "Project expense" | "Equipment" | "Family transfer" | "Personal"; description: string; amount: number; contractId?: string; workerId?: string; equipmentId?: string; approvedBy?: string };
 export type WageApproval = { id: string; workerId: string; previousType: Worker["wageType"]; previousAmount: number; newType: Worker["wageType"]; newAmount: number; reason: string; approvedBy: string; approvedAt: string };
-export type AuditEntry = { id: string; actor: string; action: "added"|"updated"|"restored"; recordType: string; recordId: string; occurredAt: string };
+export type AuditEntry = { id: string; actor: string; action: "added"|"updated"|"restored"|"deleted"; recordType: string; recordId: string; occurredAt: string };
 export type AppData = { version: 1; brandLogo?: string; monthlyWageReminderDay?: number; workers: Worker[]; contracts: Contract[]; equipment: EquipmentItem[]; maintenance: MaintenanceRecord[]; attendance: Attendance[]; ledger: Ledger[]; wageHistory: WageApproval[]; auditTrail: AuditEntry[]; overtimeCarry: Record<string, number>; updatedAt: string };
 export const STORAGE_KEY = "lakshmi-fabrication-v1";
 export const today = () => { const d=new Date(); return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`; };
@@ -40,7 +40,7 @@ export function validateBackup(input: unknown): AppData {
   const kinds = ["Receipt","Labour payment","Advance","Project expense","Equipment","Family transfer","Personal"];
   for (const e of x.ledger) if (!Number.isFinite(e.amount) || e.amount <= 0 || !kinds.includes(e.kind) || !e.description?.trim() || (e.workerId&&!workerIds.has(e.workerId)) || (e.contractId&&!contractIds.has(e.contractId)) || (e.equipmentId&&!equipmentIds.has(e.equipmentId))) throw new Error("Backup contains an invalid transaction. No records were changed.");
   for (const h of x.wageHistory) if(!workerIds.has(h.workerId)||!Number.isFinite(h.previousAmount)||!Number.isFinite(h.newAmount)||h.previousAmount<0||h.newAmount<0||!h.reason?.trim()) throw new Error("Backup contains an invalid wage approval history. No records were changed.");
-  for (const a of x.auditTrail) if(!a.id||!a.actor||!a.recordType||!a.recordId||!Number.isFinite(Date.parse(a.occurredAt))||!(["added","updated","restored"].includes(a.action))) throw new Error("Backup contains an invalid audit entry. No records were changed.");
+  for (const a of x.auditTrail) if(!a.id||!a.actor||!a.recordType||!a.recordId||!Number.isFinite(Date.parse(a.occurredAt))||!(["added","updated","restored","deleted"].includes(a.action))) throw new Error("Backup contains an invalid audit entry. No records were changed.");
   if (!Number.isFinite(Date.parse(x.updatedAt||""))) throw new Error("Backup timestamp is invalid. No records were changed.");
   return x as AppData;
 }
@@ -78,4 +78,13 @@ export function unpaidMonthlyWages(data: AppData, month: string) {
     const paid = data.ledger.filter(entry => entry.kind === "Labour payment" && entry.workerId === worker.id && entry.date.startsWith(month)).reduce((sum, entry) => sum + entry.amount, 0);
     return { worker, paid, remaining: Math.max(0, worker.monthlyWage - paid) };
   }).filter(item => item.remaining > 0);
+}
+
+export function workerDeletionBlockers(data: AppData, workerId: string) {
+  return [
+    data.attendance.some(row => row.workerId === workerId) ? "attendance" : null,
+    data.ledger.some(row => row.workerId === workerId) ? "financial entries" : null,
+    data.wageHistory.some(row => row.workerId === workerId) ? "approved wage history" : null,
+    Object.hasOwn(data.overtimeCarry, workerId) ? "overtime balance" : null,
+  ].filter((item): item is string => item !== null);
 }

@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { attendanceUnits, initialData, payrollSummary, unpaidMonthlyWages, validateBackup } from "../src/lib/model";
+import { attendanceUnits, initialData, payrollSummary, unpaidMonthlyWages, validateBackup, workerDeletionBlockers } from "../src/lib/model";
 import { createBackup, readBackup } from "../src/lib/backup";
 
 test("attendance counts regular presence and only complete overtime blocks", () => {
@@ -73,4 +73,19 @@ test("backup rejects duplicate or malformed Labour IDs", async () => {
   const digest = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(JSON.stringify(object.data)));
   object.sha256 = Array.from(new Uint8Array(digest), b=>b.toString(16).padStart(2,"0")).join("");
   await assert.rejects(() => readBackup(JSON.stringify(object)), /invalid or duplicate Labour ID/i);
+});
+
+test("worker deletion is blocked when attendance, payroll or overtime records depend on the profile", () => {
+  const data={...initialData,workers:[{id:"1001",name:"Example Worker",phone:"",role:"Labour" as const,status:"Active" as const,wageType:"Monthly" as const,monthlyWage:18000,dailyWage:0}],attendance:[{id:"a1",workerId:"1001",date:"2026-10-14",regularHours:8,overtimeHours:2,status:"P" as const,approvedBy:"Owner"}],ledger:[{id:"p1",date:"2026-10-14",kind:"Labour payment" as const,description:"Wage payment",amount:5000,workerId:"1001"}],wageHistory:[{id:"w1",workerId:"1001",previousType:"Monthly" as const,previousAmount:17000,newType:"Monthly" as const,newAmount:18000,reason:"Annual review",approvedBy:"Owner",approvedAt:"2026-10-14T10:00:00Z"}],overtimeCarry:{"1001":2}};
+  assert.deepEqual(workerDeletionBlockers(data,"1001"),["attendance","financial entries","approved wage history","overtime balance"]);
+});
+
+test("a worker without dependent records can be permanently removed", () => {
+  const data={...initialData,workers:[{id:"1001",name:"Example Worker",phone:"",role:"Labour" as const,status:"Active" as const,wageType:"Monthly" as const,monthlyWage:18000,dailyWage:0}]};
+  assert.deepEqual(workerDeletionBlockers(data,"1001"),[]);
+});
+
+test("backup validation preserves explicit worker deletion audit events", () => {
+  const auditTrail=[{id:"event-1",actor:"Owner",action:"deleted" as const,recordType:"worker profile",recordId:"1001 · Example Worker",occurredAt:"2026-10-14T10:00:00Z"}];
+  assert.deepEqual(validateBackup({...initialData,auditTrail}).auditTrail,auditTrail);
 });
