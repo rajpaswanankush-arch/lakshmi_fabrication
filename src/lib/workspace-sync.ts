@@ -36,7 +36,7 @@ export function parseWorkspaceWriteResult(result: unknown): WorkspaceWriteResult
   throw new Error("Cloud did not confirm the save.");
 }
 
-export function canConfirmWorkerDeletion(role: string | null, typedText: string, blockers: string[]): boolean {
-  return role === "owner" && typedText === "DELETE" && blockers.length === 0;
+export function canConfirmWorkerDeletion(role: string | null, typedText: string, reason: string): boolean {
+  return role === "owner" && typedText === "DELETE" && reason.trim().length >= 3;
 }
 

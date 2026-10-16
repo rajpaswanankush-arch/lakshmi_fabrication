@@ -35,11 +35,11 @@ test("a cloud mutation is successful only after the RPC confirms a saved revisio
   assert.equal(parseWorkspaceWriteResult({status:"conflict",revision:"r2",snapshot:initialData}).status,"conflict");
 });
 
-test("permanent deletion requires Owner role, exact DELETE text, and no dependencies", () => {
-  assert.equal(canConfirmWorkerDeletion("owner","DELETE",[]),true);
-  assert.equal(canConfirmWorkerDeletion("viewer","DELETE",[]),false);
-  assert.equal(canConfirmWorkerDeletion("owner","delete",[]),false);
-  assert.equal(canConfirmWorkerDeletion("owner","DELETE",["financial entries"]),false);
+test("permanent deletion requires Owner role, a short reason, and exact DELETE text", () => {
+  assert.equal(canConfirmWorkerDeletion("owner","DELETE","duplicate profile"),true);
+  assert.equal(canConfirmWorkerDeletion("viewer","DELETE","duplicate profile"),false);
+  assert.equal(canConfirmWorkerDeletion("owner","delete","duplicate profile"),false);
+  assert.equal(canConfirmWorkerDeletion("owner","DELETE"," "),false);
 });
 
 test("attendance counts regular presence and only complete overtime blocks", () => {

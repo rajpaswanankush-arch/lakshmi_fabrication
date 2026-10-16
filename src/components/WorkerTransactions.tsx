@@ -10,7 +10,7 @@ const words = {
 
 const types = ["Labour payment", "Advance", "Worker expense", "Allowance", "Reimbursement", "Wage adjustment"] as const satisfies readonly Ledger["kind"][];
 
-export function WorkerTransactions({ worker, data, lang, recorder, saveState, onSave, onReverse }: {
+export function WorkerTransactions({ worker, data, lang, recorder, saveState, onSave, onReverse, onDelete, isOwner }: {
   worker: Worker;
   data: AppData;
   lang: "en" | "hi";
@@ -18,6 +18,8 @@ export function WorkerTransactions({ worker, data, lang, recorder, saveState, on
   saveState: "saving" | "saved" | "error" | "local";
   onSave: (entry: Ledger) => void;
   onReverse: (entry: Ledger, reason: string) => void;
+  onDelete: (entry: Ledger) => void;
+  isOwner: boolean;
 }) {
   const t = words[lang];
   const kindLabel = (value: Ledger["kind"]) => (t.kind as Partial<Record<Ledger["kind"], string>>)[value] || value;
@@ -80,6 +82,7 @@ export function WorkerTransactions({ worker, data, lang, recorder, saveState, on
         <small>{t.method}: {entry.paymentMethod || "—"} · {t.recorder}: {entry.recordedBy || entry.approvedBy || "—"}{entry.adjustmentReason ? " · " + entry.adjustmentReason : ""}</small></div>
       <strong>{currency(entry.amount)}</strong>
       {entry.status !== "Reversed" && entry.kind !== "Wage adjustment" && <div className="transaction-reversal"><input aria-label={t.reverseReason} placeholder={t.reverseReason} value={reason[entry.id] || ""} onChange={e => setReason(v => ({ ...v, [entry.id]: e.target.value }))} /><button type="button" className="button button-quiet" disabled={!reason[entry.id]?.trim()} onClick={() => { if (reason[entry.id]?.trim() && window.confirm(t.reverseAsk)) { onReverse(entry, reason[entry.id].trim()); setReason(v => ({ ...v, [entry.id]: "" })); } }}>{t.reverse}</button></div>}
+      {isOwner && <div className="transaction-reversal"><button type="button" className="button button-danger" onClick={() => onDelete(entry)}>Delete record</button></div>}
     </article>) : <p className="empty-state">{t.empty}</p>}</div>
   </section>;
 }
