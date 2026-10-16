@@ -8,6 +8,19 @@ export type Ledger = { id: string; date: string; createdAt?: string; kind: "Rece
 export type WageApproval = { id: string; workerId: string; previousType: Worker["wageType"]; previousAmount: number; newType: Worker["wageType"]; newAmount: number; reason: string; approvedBy: string; approvedAt: string };
 export type AuditEntry = { id: string; actor: string; action: "added"|"updated"|"restored"|"deleted"; recordType: string; recordId: string; occurredAt: string; reason?: string; details?: string };
 export type AppData = { version: 1; brandLogo?: string; monthlyWageReminderDay?: number; workers: Worker[]; companies: Company[]; contracts: Contract[]; equipment: EquipmentItem[]; maintenance: MaintenanceRecord[]; attendance: Attendance[]; ledger: Ledger[]; wageHistory: WageApproval[]; auditTrail: AuditEntry[]; overtimeCarry: Record<string, number>; updatedAt: string };
+/** Returns a transaction and every reversal that depends on it, in ledger order. */
+export function ledgerDeletionGroup(ledger: Ledger[], entryId: string): Ledger[] {
+  const ids = new Set([entryId]);
+  let changed = true;
+  while (changed) {
+    changed = false;
+    for (const entry of ledger) if (entry.reversalOf && ids.has(entry.reversalOf) && !ids.has(entry.id)) {
+      ids.add(entry.id);
+      changed = true;
+    }
+  }
+  return ledger.filter(entry => ids.has(entry.id));
+}
 export const STORAGE_KEY = "lakshmi-fabrication-v1";
 export const today = () => { const d=new Date(); return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`; };
 export const initialData: AppData = { version: 1, monthlyWageReminderDay: 1, updatedAt: new Date().toISOString(), workers: [], companies: [], contracts: [], equipment: [], maintenance: [], attendance: [], ledger: [], wageHistory: [], auditTrail: [], overtimeCarry: {} };
@@ -135,3 +148,4 @@ export function workerDeletionBlockers(data: AppData, workerId: string) {
     Number(data.overtimeCarry[workerId] || 0) > 0 ? "overtime balance" : null,
   ].filter((item): item is string => item !== null);
 }
+
