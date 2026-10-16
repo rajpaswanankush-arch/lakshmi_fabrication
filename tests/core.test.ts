@@ -2,6 +2,45 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { attendanceUnits, initialData, payrollSummary, unpaidMonthlyWages, validateBackup, workerDeletionBlockers, overtimeMonthSummary, upsertAttendance } from "../src/lib/model";
 import { createBackup, readBackup } from "../src/lib/backup";
+import { canConfirmWorkerDeletion, decideRemoteSnapshot, parseWorkspaceWriteResult, resolveInitialWorkspace } from "../src/lib/workspace-sync";
+
+test("cloud snapshot replaces an unmarked stale browser cache and retains a recovery copy", () => {
+  const cloud={...initialData,workers:[{id:"1001",name:"Cloud worker",phone:"",role:"Labour" as const,status:"Active" as const,wageType:"Monthly" as const,monthlyWage:10000,dailyWage:0}]};
+  const local={...initialData,workers:[{id:"1002",name:"Old local worker",phone:"",role:"Labour" as const,status:"Active" as const,wageType:"Monthly" as const,monthlyWage:9000,dailyWage:0}]};
+  const result=resolveInitialWorkspace(local,{revision:"cloud-r2",snapshot:cloud},null);
+  assert.equal(result.kind,"cloud-with-recovery");
+  assert.deepEqual(result.snapshot,cloud);
+  assert.equal(result.preserveLocal,true);
+});
+
+test("only pending edits based on the current cloud revision auto-retry", () => {
+  const local={...initialData,workers:[{id:"1002",name:"Offline worker",phone:"",role:"Labour" as const,status:"Active" as const,wageType:"Monthly" as const,monthlyWage:9000,dailyWage:0}]};
+  const cloud={...initialData};
+  assert.equal(resolveInitialWorkspace(local,{revision:"r1",snapshot:cloud},{baseRevision:"r1"}).kind,"pending");
+  assert.equal(resolveInitialWorkspace(local,{revision:"r2",snapshot:cloud},{baseRevision:"r1"}).kind,"conflict");
+});
+
+test("remote snapshots apply only when this device has no unsaved edits", () => {
+  const synced={...initialData};
+  const cloud={...initialData,workers:[{id:"1001",name:"Remote",phone:"",role:"Labour" as const,status:"Active" as const,wageType:"Monthly" as const,monthlyWage:10000,dailyWage:0}]};
+  assert.equal(decideRemoteSnapshot(synced,synced,"r1",{revision:"r2",snapshot:cloud}),"apply-cloud");
+  assert.equal(decideRemoteSnapshot({...synced,updatedAt:"local-edit"},synced,"r1",{revision:"r2",snapshot:cloud}),"conflict");
+  assert.equal(decideRemoteSnapshot(synced,synced,"r2",{revision:"r2",snapshot:cloud}),"unchanged");
+});
+
+test("a cloud mutation is successful only after the RPC confirms a saved revision", () => {
+  assert.equal(parseWorkspaceWriteResult({status:"saved",revision:"r2"}).status,"saved");
+  assert.throws(()=>parseWorkspaceWriteResult({status:"pending"}),/did not confirm/i);
+  assert.throws(()=>parseWorkspaceWriteResult({status:"saved"}),/did not confirm/i);
+  assert.equal(parseWorkspaceWriteResult({status:"conflict",revision:"r2",snapshot:initialData}).status,"conflict");
+});
+
+test("permanent deletion requires Owner role, exact DELETE text, and no dependencies", () => {
+  assert.equal(canConfirmWorkerDeletion("owner","DELETE",[]),true);
+  assert.equal(canConfirmWorkerDeletion("viewer","DELETE",[]),false);
+  assert.equal(canConfirmWorkerDeletion("owner","delete",[]),false);
+  assert.equal(canConfirmWorkerDeletion("owner","DELETE",["financial entries"]),false);
+});
 
 test("attendance counts regular presence and only complete overtime blocks", () => {
   assert.equal(attendanceUnits({ id:"1",workerId:"1001",date:"2026-10-14",regularHours:8,overtimeHours:7.5,status:"P",approvedBy:"Owner" }), 1);

@@ -100,6 +100,6 @@ export function workerDeletionBlockers(data: AppData, workerId: string) {
     data.attendance.some(row => row.workerId === workerId) ? "attendance" : null,
     data.ledger.some(row => row.workerId === workerId) ? "financial entries" : null,
     data.wageHistory.some(row => row.workerId === workerId) ? "approved wage history" : null,
-    Object.hasOwn(data.overtimeCarry, workerId) ? "overtime balance" : null,
+    Number(data.overtimeCarry[workerId] || 0) > 0 ? "overtime balance" : null,
   ].filter((item): item is string => item !== null);
 }
