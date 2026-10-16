@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { attendanceUnits, initialData, payrollSummary, unpaidMonthlyWages, validateBackup, workerDeletionBlockers, overtimeMonthSummary, upsertAttendance } from "../src/lib/model";
+import { attendanceUnits, initialData, payrollSummary, unpaidMonthlyWages, validateBackup, workerDeletionBlockers, overtimeMonthSummary, upsertAttendance, workerFinancialSummary } from "../src/lib/model";
 import { createBackup, readBackup } from "../src/lib/backup";
 import { canConfirmWorkerDeletion, decideRemoteSnapshot, parseWorkspaceWriteResult, resolveInitialWorkspace } from "../src/lib/workspace-sync";
 
@@ -88,6 +88,23 @@ test("monthly wage reminders show only the unpaid balance for the current month"
   assert.equal(due.length,1);
   assert.equal(due[0].remaining,13000);
   assert.equal(unpaidMonthlyWages(data,"2026-11")[0].remaining,18000);
+});
+
+test("worker financial summary separates wages, advances and expenses and ignores reversals", () => {
+  const data={...initialData,workers:[{id:"1001",name:"Example Worker",phone:"",role:"Labour" as const,status:"Active" as const,wageType:"Monthly" as const,monthlyWage:18000,dailyWage:0}],ledger:[
+    {id:"pay",date:"2026-10-03",kind:"Labour payment" as const,description:"Weekly wage",amount:3000,workerId:"1001"},
+    {id:"advance",date:"2026-10-04",kind:"Advance" as const,description:"Advance",amount:1000,workerId:"1001"},
+    {id:"travel",date:"2026-10-05",kind:"Worker expense" as const,description:"Ticket",amount:450,workerId:"1001"},
+    {id:"void",date:"2026-10-06",kind:"Labour payment" as const,description:"Duplicate reversed",amount:9000,workerId:"1001",status:"Reversed" as const},
+  ]};
+  assert.deepEqual(workerFinancialSummary(data,"1001","2026-10"),{earned:18000,paid:3000,advances:1000,expenses:450,balance:14000});
+});
+
+test("shared snapshot validation rejects duplicate and cross-worker financial records", () => {
+  const worker={id:"1001",name:"Example Worker",phone:"",role:"Labour" as const,status:"Active" as const,wageType:"Monthly" as const,monthlyWage:18000,dailyWage:0};
+  const entry={id:"pay",date:"2026-10-03",kind:"Labour payment" as const,description:"Wage payment",amount:3000,workerId:"1001"};
+  assert.throws(()=>validateBackup({...initialData,workers:[worker],ledger:[entry,{...entry}]}),/invalid transaction/i);
+  assert.throws(()=>validateBackup({...initialData,workers:[worker],ledger:[{...entry,workerId:"9999"}]}),/invalid transaction/i);
 });
 
 test("daily payroll carries overtime across days before calculating its equivalent", () => {
