@@ -95,9 +95,10 @@ test("worker financial summary separates wages, advances and expenses and ignore
     {id:"pay",date:"2026-10-03",kind:"Labour payment" as const,description:"Weekly wage",amount:3000,workerId:"1001"},
     {id:"advance",date:"2026-10-04",kind:"Advance" as const,description:"Advance",amount:1000,workerId:"1001"},
     {id:"travel",date:"2026-10-05",kind:"Worker expense" as const,description:"Ticket",amount:450,workerId:"1001"},
-    {id:"void",date:"2026-10-06",kind:"Labour payment" as const,description:"Duplicate reversed",amount:9000,workerId:"1001",status:"Reversed" as const},
+    {id:"adjust",date:"2026-10-06",kind:"Wage adjustment" as const,description:"Approved extra",amount:600,workerId:"1001"},
+    {id:"void",date:"2026-10-07",kind:"Labour payment" as const,description:"Duplicate reversed",amount:9000,workerId:"1001",status:"Reversed" as const},
   ]};
-  assert.deepEqual(workerFinancialSummary(data,"1001","2026-10"),{earned:18000,paid:3000,advances:1000,expenses:450,balance:14000});
+  assert.deepEqual(workerFinancialSummary(data,"1001","2026-10"),{earned:18000,paid:3000,advances:1000,expenses:450,adjustments:600,balance:14000});
 });
 
 test("shared snapshot validation rejects duplicate and cross-worker financial records", () => {

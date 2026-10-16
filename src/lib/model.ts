@@ -111,7 +111,7 @@ export function unpaidMonthlyWages(data: AppData, month: string) {
 
 export function workerFinancialSummary(data: AppData, workerId: string, month: string) {
   const worker = data.workers.find(w => w.id === workerId);
-  if (!worker) return { earned: 0, paid: 0, advances: 0, expenses: 0, balance: 0 };
+  if (!worker) return { earned: 0, paid: 0, advances: 0, expenses: 0, adjustments: 0, balance: 0 };
   const rows = data.attendance.filter(a => a.workerId === workerId && a.date.slice(0, 7) === month).sort((a, b) => a.date.localeCompare(b.date));
   let earned = worker.wageType === "Monthly" ? worker.monthlyWage : worker.wageType === "Contract" ? (worker.contractWage || 0) : 0;
   if (worker.wageType === "Daily") {
@@ -123,7 +123,8 @@ export function workerFinancialSummary(data: AppData, workerId: string, month: s
   const paid = entries.filter(l => l.kind === "Labour payment").reduce((sum, l) => sum + l.amount, 0);
   const advances = entries.filter(l => l.kind === "Advance").reduce((sum, l) => sum + l.amount, 0);
   const expenses = entries.filter(l => ["Worker expense", "Project expense", "Allowance", "Reimbursement"].includes(l.kind)).reduce((sum, l) => sum + l.amount, 0);
-  return { earned, paid, advances, expenses, balance: Math.max(0, earned - paid - advances) };
+  const adjustments = entries.filter(l => l.kind === "Wage adjustment").reduce((sum, l) => sum + l.amount, 0);
+  return { earned, paid, advances, expenses, adjustments, balance: Math.max(0, earned - paid - advances) };
 }
 
 export function workerDeletionBlockers(data: AppData, workerId: string) {
