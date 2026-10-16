@@ -47,12 +47,27 @@ export function validateBackup(input: unknown): AppData {
 export const currency = (n: number) => new Intl.NumberFormat("en-IN", { style: "currency", currency: "INR", maximumFractionDigits: 0 }).format(n);
 export function attendanceUnits(a: Attendance, carryHours = 0) {
   const regular = a.status === "P" ? Math.min(a.regularHours, 8) / 8 : 0;
-  const overtimeBlocks = Math.floor((carryHours + a.overtimeHours) / 8) - Math.floor(carryHours / 8);
+  const overtimeBlocks = Math.floor(Math.round((carryHours + a.overtimeHours) * 100) / 800) - Math.floor(Math.round(carryHours * 100) / 800);
   return regular + overtimeBlocks;
 }
 export function overtimeRemainder(rows: Attendance[], workerId: string) {
   const hours = rows.filter(a => a.workerId === workerId).reduce((sum, a) => sum + a.overtimeHours, 0);
-  return Math.round((hours % 8) * 100) / 100;
+  return Math.round(hours * 100) % 800 / 100;
+}
+export function overtimeMonthSummary(rows: Attendance[], workerId: string, month: string) {
+  const workerRows = rows.filter(a => a.workerId === workerId).sort((a, b) => a.date.localeCompare(b.date));
+  const carryInTotal = workerRows.filter(a => a.date.slice(0, 7) < month).reduce((sum, a) => sum + a.overtimeHours, 0);
+  const carryIn = Math.round(carryInTotal * 100) % 800 / 100;
+  const monthRows = workerRows.filter(a => a.date.slice(0, 7) === month);
+  const hours = monthRows.reduce((sum, a) => sum + a.overtimeHours, 0);
+  const combined = Math.round((carryIn + hours) * 100);
+  return { hours, carryIn, units: Math.floor(combined / 800), remainder: combined % 800 / 100 };
+}
+export function upsertAttendance(rows: Attendance[], workerId: string, date: string, status: "P" | "A", overtimeHours: number, approvedBy: string) {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(date) || !Number.isInteger(overtimeHours) || overtimeHours < 0 || overtimeHours > 24) throw new Error("Use a valid date and whole overtime hours from 0 to 24.");
+  const previous = rows.find(a => a.workerId === workerId && a.date === date);
+  const next: Attendance = { id: previous?.id ?? crypto.randomUUID(), workerId, date, regularHours: status === "P" ? 8 : 0, overtimeHours, status, approvedBy };
+  return previous ? rows.map(a => a.id === previous.id ? next : a) : [...rows, next];
 }
 export function payrollSummary(data: AppData, month: string) {
   let fixedMonthly = 0, dailyEarned = 0, contractAgreed = 0;
@@ -61,10 +76,10 @@ export function payrollSummary(data: AppData, month: string) {
     if (worker.wageType === "Contract") contractAgreed += worker.contractWage || 0;
     if (worker.wageType !== "Daily") continue;
     const earlier = data.attendance.filter(a => a.workerId === worker.id && a.date.slice(0,7) < month).reduce((s,a)=>s+a.overtimeHours,0);
-    let carry = earlier % 8;
+    let carry = Math.round(earlier * 100) % 800 / 100;
     for (const row of data.attendance.filter(a => a.workerId === worker.id && a.date.slice(0,7) === month).sort((a,b)=>a.date.localeCompare(b.date))) {
       dailyEarned += attendanceUnits(row, carry) * worker.dailyWage;
-      carry = (carry + row.overtimeHours) % 8;
+      carry = Math.round((carry + row.overtimeHours) * 100) % 800 / 100;
     }
   }
   const contractIds = new Set(data.workers.filter(w=>w.status!=="Archived"&&w.wageType==="Contract").map(w=>w.id));

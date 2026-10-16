@@ -1,6 +1,6 @@
 # Lakshmi Fabrication
 
-A minimal Hindi/English workforce, attendance, contract and cashbook app with a local-first PWA shell and a separate integrity-checked backup/restore path.
+A minimal Hindi/English workforce, attendance, contract and cashbook app with a shared Supabase workspace and a separate integrity-checked backup/restore path.
 
 ## Run locally
 
@@ -16,7 +16,7 @@ A minimal Hindi/English workforce, attendance, contract and cashbook app with a 
 
 ## Supabase setup
 
-The initial migration and subsequent owner-only access hardening are in `supabase/migrations/`. They create the workforce, wage, attendance, contract, equipment, ledger and audit tables, owner-only read/write policies, and revision-checked local-first snapshot sync. The connected project has these migrations applied; business tables are currently empty. No production records were changed during this work.
+The initial migration and subsequent owner-only access hardening are in `supabase/migrations/`. They create the workforce, wage, attendance, contract, equipment, ledger and audit tables, owner-only access policies, and revision-checked workspace snapshot sync. The app persists its current workspace in the owner-only `workspace_snapshots` table; the normalized business tables are not currently used by the client. After sign-in, the app loads the shared snapshot, saves local changes automatically with optimistic revision checks, and checks for changes from other devices every 15 seconds. If both the cloud and this browser have unsynchronized edits, it asks the owner which copy to keep.
 
 Create the first sign-in in Supabase Auth (public sign-up remains disabled), then assign its UUID as owner in SQL Editor:
 
@@ -26,7 +26,7 @@ values ('<AUTH_USER_UUID>', 'Owner', 'owner')
 on conflict (user_id) do update set role = 'owner', updated_at = now();
 ```
 
-Configure `NEXT_PUBLIC_SUPABASE_URL` and `NEXT_PUBLIC_SUPABASE_ANON_KEY`. Only the owner role can read or change workspace data. The app sync button uses compare-and-set revisions and requires an explicit choice if a newer cloud copy exists. Keep the downloadable backup separate from this project.
+Configure `NEXT_PUBLIC_SUPABASE_URL` and `NEXT_PUBLIC_SUPABASE_ANON_KEY`. Only the owner role can read or change workspace data. The manual Sync now action remains available for an immediate save; normal saves and refreshes happen automatically. Keep the downloadable backup separate from this project.
 
 ## Current implementation notes
 

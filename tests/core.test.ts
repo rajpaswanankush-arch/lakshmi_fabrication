@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { attendanceUnits, initialData, payrollSummary, unpaidMonthlyWages, validateBackup, workerDeletionBlockers } from "../src/lib/model";
+import { attendanceUnits, initialData, payrollSummary, unpaidMonthlyWages, validateBackup, workerDeletionBlockers, overtimeMonthSummary, upsertAttendance } from "../src/lib/model";
 import { createBackup, readBackup } from "../src/lib/backup";
 
 test("attendance counts regular presence and only complete overtime blocks", () => {
@@ -14,6 +14,27 @@ test("overtime remainder carries between workdays", () => {
   const day2={id:"2",workerId:"1001",date:"2026-10-14",regularHours:8,overtimeHours:3,status:"P" as const,approvedBy:"Owner"};
   assert.equal(attendanceUnits(day1),1);
   assert.equal(attendanceUnits(day2,5),2);
+  assert.equal(attendanceUnits({...day2,overtimeHours:0.1},7.9),2);
+});
+
+test("monthly overtime converts complete 8-hour blocks and carries the remainder", () => {
+  const rows=[
+    {id:"a",workerId:"1001",date:"2026-09-30",regularHours:8,overtimeHours:5,status:"P" as const,approvedBy:"Owner"},
+    {id:"b",workerId:"1001",date:"2026-10-01",regularHours:8,overtimeHours:4,status:"P" as const,approvedBy:"Owner"},
+    {id:"c",workerId:"1001",date:"2026-10-02",regularHours:0,overtimeHours:3,status:"A" as const,approvedBy:"Owner"},
+  ];
+  assert.deepEqual(overtimeMonthSummary(rows,"1001","2026-10"),{hours:7,carryIn:5,units:1,remainder:4});
+});
+
+test("attendance edits replace the date record without duplicates and require whole OT hours", () => {
+  const original={id:"stable",workerId:"1001",date:"2026-10-01",regularHours:8,overtimeHours:2,status:"P" as const,approvedBy:"Owner"};
+  const edited=upsertAttendance([original],"1001","2026-10-01","A",3,"Owner");
+  assert.equal(edited.length,1);
+  assert.equal(edited[0].id,"stable");
+  assert.equal(edited[0].status,"A");
+  assert.equal(edited[0].regularHours,0);
+  assert.equal(edited[0].overtimeHours,3);
+  assert.throws(()=>upsertAttendance(edited,"1001","2026-10-01","P",1.5,"Owner"),/whole overtime hours/i);
 });
 
 test("monthly agreed wages remain fixed when a worker is absent", () => {
