@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { initialData, ledgerDeletionGroup, validateBackup } from "../src/lib/model";
+import { initialData, ledgerDeletionGroup, unlinkWorkerLedgerEntries, validateBackup } from "../src/lib/model";
 import { createBackup, readBackup } from "../src/lib/backup";
 
 test("SUNDAY ₹500 deletion removes its linked reversal and keeps backup restore valid", async () => {
@@ -15,5 +15,14 @@ test("SUNDAY ₹500 deletion removes its linked reversal and keeps backup restor
   const repaired=validateBackup({...initialData,ledger:[unrelated]});
   assert.deepEqual(repaired.ledger,[unrelated]);
   assert.deepEqual((await readBackup(await createBackup(repaired))).ledger,[unrelated]);
+});
+
+test("deleting a worker keeps cashbook entries that have no worker link", () => {
+  const familyTransfer={id:"family",date:"2026-10-15",kind:"Family transfer" as const,description:"TO ARTI DEVI",amount:90000};
+  const workerPayment={id:"pay",date:"2026-10-15",kind:"Labour payment" as const,description:"Wage",amount:500,workerId:"0001"};
+  assert.deepEqual(unlinkWorkerLedgerEntries([familyTransfer,workerPayment],"0001"),[
+    familyTransfer,
+    {id:"pay",date:"2026-10-15",kind:"Labour payment",description:"Wage",amount:500},
+  ]);
 });
 

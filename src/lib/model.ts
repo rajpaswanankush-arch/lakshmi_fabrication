@@ -21,6 +21,15 @@ export function ledgerDeletionGroup(ledger: Ledger[], entryId: string): Ledger[]
   }
   return ledger.filter(entry => ids.has(entry.id));
 }
+/** Removes a deleted worker link while preserving unrelated and unlinked transactions. */
+export function unlinkWorkerLedgerEntries(ledger: Ledger[], workerId: string): Ledger[] {
+  return ledger.map(entry => {
+    if (entry.workerId !== workerId) return entry;
+    const unlinked = { ...entry };
+    delete unlinked.workerId;
+    return unlinked;
+  });
+}
 export const STORAGE_KEY = "lakshmi-fabrication-v1";
 export const today = () => { const d=new Date(); return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`; };
 export const initialData: AppData = { version: 1, monthlyWageReminderDay: 1, updatedAt: new Date().toISOString(), workers: [], companies: [], contracts: [], equipment: [], maintenance: [], attendance: [], ledger: [], wageHistory: [], auditTrail: [], overtimeCarry: {} };
