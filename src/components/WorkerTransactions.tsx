@@ -52,7 +52,7 @@ export function WorkerTransactions({ worker, data, lang, recorder, saveState, on
     window.setTimeout(() => setBusy(false), 1000);
   }
 
-  return <section className="worker-transactions profile-history">
+  return <section className="worker-transactions">
     <div className="profile-transaction-heading"><h3>{t.title}</h3><span className={`transaction-save-state ${saveState}`} role="status">{saveState === "saving" ? t.saving : saveState === "saved" ? t.saved : saveState === "error" ? t.error : t.local}</span></div>
     <div className="worker-money-summary">
       {([[t.wage, summary.earned], [t.paid, summary.paid], [t.advances, summary.advances], [t.expenses, summary.expenses], [t.adjustments, summary.adjustments], [t.balance, summary.balance]] as const).map(([label, amount]) => <div key={label}><small>{label}</small><b>{currency(amount)}</b></div>)}
