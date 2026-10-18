@@ -97,3 +97,5 @@ body{background:var(--canvas);color:var(--ink);font-family:Inter,Arial,sans-seri
 }
 
 .workspace-reset-card{margin-top:14px;min-height:0;border-color:#eee2d8;background:#fffdfa}.workspace-reset-card .button{margin-top:4px}.workspace-reset-card p{max-width:760px}
+
+.profile-avatar img{width:100%;height:100%;border-radius:inherit;object-fit:cover}.profile{cursor:pointer}.profile:hover{background:#faf8f5}.owner-profile-form{display:grid;gap:12px}.owner-profile-preview{display:flex;align-items:center;gap:12px;padding:12px;background:#faf7f2;border:1px solid var(--line);border-radius:10px}.owner-profile-preview .profile-avatar{width:56px;height:56px;flex:none}.owner-profile-preview>div{display:grid;gap:4px;min-width:0}.owner-profile-preview small{color:var(--muted);overflow-wrap:anywhere}.reset-progress{padding:16px;border-radius:10px;background:#f3f7f2;color:#52645a;line-height:1.55;font-size:14px}.reset-progress .welcome-mark{display:grid;place-items:center;margin:0 auto 10px;width:42px;height:42px;border-radius:50%;background:#e3f0e5;color:#438154;font-size:24px}.reset-progress p{margin:0;text-align:center}
