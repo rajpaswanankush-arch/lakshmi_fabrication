@@ -1,5 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
 import { attendanceUnits, initialData, payrollSummary, unpaidMonthlyWages, validateBackup, workerDeletionBlockers, overtimeMonthSummary, upsertAttendance, workerFinancialSummary } from "../src/lib/model";
 import { createBackup, readBackup } from "../src/lib/backup";
 import { buildBackupTables, createExcelBackupBuffer, createPdfBackupBuffer } from "../src/lib/backup-exports";
@@ -227,4 +228,14 @@ test("a worker without dependent records can be permanently removed", () => {
 test("backup validation preserves explicit worker deletion audit events", () => {
   const auditTrail=[{id:"event-1",actor:"Owner",action:"deleted" as const,recordType:"worker profile",recordId:"1001 · Example Worker",occurredAt:"2026-10-14T10:00:00Z"}];
   assert.deepEqual(validateBackup({...initialData,auditTrail}).auditTrail,auditTrail);
+});
+
+
+test("worker deletion migration keeps earlier worker removal when preserving linked cashbook entries", () => {
+  const sql=readFileSync("supabase/migrations/20261018120000_fix_worker_deletion_snapshot_chain.sql","utf8");
+  const ledgerUpdate=sql.match(/v_snapshot\s*:=\s*jsonb_set\(v_snapshot,\s*'\{ledger\}'[\s\S]*?\);/i)?.[0];
+  assert.ok(ledgerUpdate,"migration must update ledger on the already filtered snapshot");
+  assert.match(ledgerUpdate,/jsonb_array_elements\(coalesce\(v_snapshot->'ledger'/i);
+  assert.doesNotMatch(ledgerUpdate,/v_row\.snapshot/i);
+  assert.match(sql,/Worker deletion did not remove profile; no changes were committed/);
 });
