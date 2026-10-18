@@ -81,6 +81,16 @@ test("permanent deletion requires Owner role, a short reason, and exact DELETE t
   assert.equal(canConfirmWorkerDeletion("owner","DELETE"," "),false);
 });
 
+test("linked worker history is preserved but does not block an Owner's confirmed test-profile deletion", () => {
+  const data={...initialData,
+    workers:[{id:"1001",name:"Test Labour",phone:"",role:"Labour" as const,status:"Active" as const,wageType:"Daily" as const,monthlyWage:0,dailyWage:500}],
+    attendance:[{id:"att-1",workerId:"1001",date:"2026-10-01",regularHours:8,overtimeHours:0,status:"P" as const,approvedBy:"Owner"}],
+  };
+  assert.deepEqual(workerDeletionBlockers(data,"1001"),["attendance"]);
+  assert.equal(canConfirmWorkerDeletion("owner","DELETE","test profile cleanup"),true);
+  assert.equal(canConfirmWorkerDeletion("owner","DELETE",""),false);
+});
+
 test("attendance counts regular presence and only complete overtime blocks", () => {
   assert.equal(attendanceUnits({ id:"1",workerId:"1001",date:"2026-10-14",regularHours:8,overtimeHours:7.5,status:"P",approvedBy:"Owner" }), 1);
   assert.equal(attendanceUnits({ id:"2",workerId:"1001",date:"2026-10-14",regularHours:8,overtimeHours:8,status:"P",approvedBy:"Owner" }), 2);
