@@ -87,11 +87,13 @@ test("worker deletion/reset mutation lock blocks overlapping autosaves", () => {
   assert.equal(mayStartWorkspaceSync(true), false);
 });
 
-test("client workspace reset requires Owner, reason, and exact phrase", () => {
-  assert.equal(canConfirmWorkspaceReset("owner","RESET WORKSPACE","clear test data"), true);
-  assert.equal(canConfirmWorkspaceReset("viewer","RESET WORKSPACE","clear test data"), false);
-  assert.equal(canConfirmWorkspaceReset("owner","reset workspace","clear test data"), false);
-  assert.equal(canConfirmWorkspaceReset("owner","RESET WORKSPACE",""), false);
+test("client workspace reset requires Owner, reason, and both exact phrases", () => {
+  assert.equal(canConfirmWorkspaceReset("owner","RESET WORKSPACE","clear test data","I CONFIRM"), true);
+  assert.equal(canConfirmWorkspaceReset("viewer","RESET WORKSPACE","clear test data","I CONFIRM"), false);
+  assert.equal(canConfirmWorkspaceReset("owner","reset workspace","clear test data","I CONFIRM"), false);
+  assert.equal(canConfirmWorkspaceReset("owner","RESET WORKSPACE","","I CONFIRM"), false);
+  assert.equal(canConfirmWorkspaceReset("owner","RESET WORKSPACE","clear test data","I confirm"), false);
+  assert.equal(canConfirmWorkspaceReset("owner","RESET WORKSPACE","clear test data",""), false);
 });
 
 test("linked worker history is preserved but does not block an Owner's confirmed test-profile deletion", () => {
