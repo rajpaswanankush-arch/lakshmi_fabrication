@@ -33,6 +33,9 @@ export function unlinkWorkerLedgerEntries(ledger: Ledger[], workerId: string): L
 export const STORAGE_KEY = "lakshmi-fabrication-v1";
 export const today = () => { const d=new Date(); return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`; };
 export const initialData: AppData = { version: 1, monthlyWageReminderDay: 1, updatedAt: new Date().toISOString(), workers: [], companies: [], contracts: [], equipment: [], maintenance: [], attendance: [], ledger: [], wageHistory: [], auditTrail: [], overtimeCarry: {} };
+export function legacyCompanyId(name: string, fallback: string) {
+  return `legacy-${name.trim().toLowerCase().replace(/[^a-z0-9]+/g,"-").replace(/^-|-$/g,"") || fallback}`;
+}
 export function loadData(): AppData {
   if (typeof window === "undefined") return initialData;
   try { const raw = localStorage.getItem(STORAGE_KEY); if (raw) return validateBackup(JSON.parse(raw)); } catch { /* use the starter workspace until a valid local copy is available */ }
@@ -74,7 +77,7 @@ export function validateBackup(input: unknown): AppData {
   // Preserve those contracts and create stable company identities for the new UI.
   const seenCompanies = new Set(x.companies.map(c => c.name.trim().toLocaleLowerCase()));
   for (const contract of x.contracts) if (!seenCompanies.has(contract.company.trim().toLocaleLowerCase())) {
-    const id = contract.companyId || `legacy-${contract.company.trim().toLowerCase().replace(/[^a-z0-9]+/g,"-").replace(/^-|-$/g,"") || contract.id}`;
+    const id = contract.companyId || legacyCompanyId(contract.company, contract.id);
     x.companies.push({ id, name: contract.company.trim() }); seenCompanies.add(contract.company.trim().toLocaleLowerCase());
   }
   for (const contract of x.contracts) if (!contract.companyId) contract.companyId = x.companies.find(c => c.name.trim().toLocaleLowerCase() === contract.company.trim().toLocaleLowerCase())?.id;
