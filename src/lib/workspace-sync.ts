@@ -40,3 +40,12 @@ export function canConfirmWorkerDeletion(role: string | null, typedText: string,
   return role === "owner" && typedText === "DELETE" && reason.trim().length >= 3;
 }
 
+export function canConfirmWorkspaceReset(role: string | null, typedText: string, reason: string): boolean {
+  return role === "owner" && typedText === "RESET WORKSPACE" && reason.trim().length >= 3;
+}
+
+/** Block autosaves and remote refreshes while an audited destructive mutation is in flight. */
+export function mayStartWorkspaceSync(mutationInFlight: boolean): boolean {
+  return !mutationInFlight;
+}
+

@@ -63,6 +63,27 @@ export function CompaniesPanel({ companies, contracts, ownerId, lang, selectedId
   return <section className="panel section-panel company-management">
     <div className="table-toolbar"><div><h2>{hi ? "कंपनियाँ और साइट" : "Companies and sites"}</h2><p>{hi ? "कंपनी का नाम चुनें और उसके जुड़े ठेके देखें।" : "Choose a company to see its linked contracts and work sites."}</p></div><button className="button button-primary" onClick={() => { setEditId(""); setPreview(""); setError(""); }}><Plus size={16}/>{hi ? "कंपनी जोड़ें" : "Add company"}</button></div>
     {editId !== null && <form className="company-editor" action={save}><h3>{editing ? (hi ? "कंपनी बदलें" : "Edit company") : (hi ? "नई कंपनी" : "New company")}</h3><label>{hi ? "कंपनी का नाम" : "Company name"}<input name="name" required defaultValue={editing?.name || ""}/></label><div className="form-row"><label>{hi ? "संपर्क व्यक्ति" : "Contact name"}<input name="contactName" defaultValue={editing?.contactName || ""}/></label><label>{hi ? "फ़ोन" : "Phone"}<input name="phone" inputMode="tel" defaultValue={editing?.phone || ""}/></label></div><label>{hi ? "नोट" : "Notes"}<textarea name="notes" rows={2} defaultValue={editing?.notes || ""}/></label><div className="company-logo-preview">{preview ? <img src={preview} alt="Logo preview"/> : editing?.logoPath && !removeLogo && signed[editing.id] ? <img src={signed[editing.id]} alt={editing.name+" logo"}/> : <span>{(editing?.name || "LF").split(" ").map(x => x[0]).slice(0,2).join("").toUpperCase()}</span>}</div><label>{hi ? "लोगो · JPG/PNG/WebP · 2 MB तक" : "Logo · JPG/PNG/WebP · up to 2 MB"}<input name="logo" type="file" accept="image/jpeg,image/png,image/webp" onChange={e => { const f=e.currentTarget.files?.[0];if(!f)return;if(!["image/jpeg","image/png","image/webp"].includes(f.type)||f.size>2*1024*1024){setError(hi?"JPG, PNG या WebP चित्र चुनें, अधिकतम 2 MB।":"Choose a JPG, PNG or WebP image up to 2 MB.");e.currentTarget.value="";return}setRemoveLogo(false);setError("");setPreview(URL.createObjectURL(f)); }}/></label>{editing?.logoPath&&<button type="button" className="table-action danger-text" onClick={()=>{setRemoveLogo(v=>!v);setPreview("")}}>{removeLogo?(hi?"लोगो बनाए रखें":"Keep current logo"):(hi?"लोगो हटाएँ":"Remove current logo")}</button>}{error&&<div className="auth-error" role="alert">{error}</div>}<div className="modal-actions"><button type="button" className="button button-quiet" onClick={()=>{setEditId(null);setPreview("");setRemoveLogo(false)}}>{hi?"रद्द करें":"Cancel"}</button><button className="button button-primary" disabled={busy}>{busy?(hi?"सहेज रहे हैं…":"Saving…"):(hi?"सहेजें":"Save company")}</button></div></form>}
-    <div className="company-list">{companies.map(c => {const sites=contracts.filter(x=>x.companyId===c.id||x.company.toLowerCase()===c.name.toLowerCase());return <article key={c.id} className={"company-list-card "+(selectedId===c.id?"selected":"")}><button className="company-open" onClick={()=>onSelect(selectedId===c.id?"":c.id)}><span className="company-logo">{signed[c.id]?<img src={signed[c.id]} alt={c.name+" logo"}/>:c.name.split(" ").map(x=>x[0]).slice(0,2).join("").toUpperCase()}</span><span><b>{c.name}</b><small>{sites.length} {hi?"ठेके / साइट":"contracts / sites"}</small></span></button><div className="company-actions"><button className="table-action" onClick={()=>{setEditId(c.id);setError("")}}>{hi?"बदलें":"Edit"}</button><button className="table-action danger-text" onClick={()=>onDelete(c)}><Trash2 size={14}/>{hi?"हटाएँ":"Delete"}</button></div></article>})}{companies.length===0&&!editing&&<div className="empty-state"><Building2 size={20}/>{hi?"अभी कोई कंपनी दर्ज नहीं है।":"No companies added yet."}</div>}</div>
+    <div className="company-list">{companies.map(c => {
+      const sites=contracts.filter(x=>x.companyId===c.id||x.company.toLowerCase()===c.name.toLowerCase());
+      const selected=selectedId===c.id;
+      return <article key={c.id} className={"company-list-card "+(selected?"selected":"")}>
+        <button type="button" className="company-open" aria-expanded={selected} onClick={()=>onSelect(selected?"":c.id)}>
+          <span className="company-logo">{signed[c.id]?<img src={signed[c.id]} alt={c.name+" logo"}/>:c.name.split(" ").map(x=>x[0]).slice(0,2).join("").toUpperCase()}</span>
+          <span><b>{c.name}</b><small>{sites.length} {hi?"ठेके / साइट":"contracts / sites"}</small></span>
+        </button>
+        {selected&&<div className="company-profile-details">
+          <div className="company-profile-facts">
+            {c.contactName&&<span><small>{hi?"संपर्क":"Contact"}</small><b>{c.contactName}</b></span>}
+            {c.phone&&<span><small>{hi?"फ़ोन":"Phone"}</small><b>{c.phone}</b></span>}
+            {c.notes&&<span className="company-notes"><small>{hi?"नोट":"Notes"}</small><b>{c.notes}</b></span>}
+          </div>
+          <div className="company-site-list"><b>{hi?"जुड़ी साइटें":"Linked sites"}</b>{sites.length?sites.map(site=><span key={site.id}>{site.title} · {site.location} · ₹{site.value.toLocaleString("en-IN")}</span>):<small>{hi?"अभी कोई साइट नहीं।":"No sites linked yet."}</small>}</div>
+          <div className="company-actions">
+            <button className="table-action" onClick={()=>{setEditId(c.id);setError("");setPreview("");setRemoveLogo(false)}}>{hi?"बदलें":"Edit company"}</button>
+            <button className="table-action danger-text" onClick={()=>onDelete(c)}><Trash2 size={14}/>{hi?"हटाएँ":"Delete company"}</button>
+          </div>
+        </div>}
+      </article>;
+    })}{companies.length===0&&!editing&&<div className="empty-state"><Building2 size={20}/>{hi?"अभी कोई कंपनी दर्ज नहीं है।":"No companies added yet."}</div>}</div>
   </section>;
 }

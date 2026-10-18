@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import { attendanceUnits, initialData, payrollSummary, unpaidMonthlyWages, validateBackup, workerDeletionBlockers, overtimeMonthSummary, upsertAttendance, workerFinancialSummary } from "../src/lib/model";
 import { createBackup, readBackup } from "../src/lib/backup";
 import { buildBackupTables, createExcelBackupBuffer, createPdfBackupBuffer } from "../src/lib/backup-exports";
-import { canConfirmWorkerDeletion, decideRemoteSnapshot, parseWorkspaceWriteResult, resolveInitialWorkspace } from "../src/lib/workspace-sync";
+import { canConfirmWorkerDeletion, canConfirmWorkspaceReset, mayStartWorkspaceSync, decideRemoteSnapshot, parseWorkspaceWriteResult, resolveInitialWorkspace } from "../src/lib/workspace-sync";
 
 test("report backups include worker, site, attendance, cashbook, and audit records while excluding reversed amounts from totals", () => {
   const data={...initialData,
@@ -79,6 +79,18 @@ test("permanent deletion requires Owner role, a short reason, and exact DELETE t
   assert.equal(canConfirmWorkerDeletion("viewer","DELETE","duplicate profile"),false);
   assert.equal(canConfirmWorkerDeletion("owner","delete","duplicate profile"),false);
   assert.equal(canConfirmWorkerDeletion("owner","DELETE"," "),false);
+});
+
+test("worker deletion/reset mutation lock blocks overlapping autosaves", () => {
+  assert.equal(mayStartWorkspaceSync(false), true);
+  assert.equal(mayStartWorkspaceSync(true), false);
+});
+
+test("client workspace reset requires Owner, reason, and exact phrase", () => {
+  assert.equal(canConfirmWorkspaceReset("owner","RESET WORKSPACE","clear test data"), true);
+  assert.equal(canConfirmWorkspaceReset("viewer","RESET WORKSPACE","clear test data"), false);
+  assert.equal(canConfirmWorkspaceReset("owner","reset workspace","clear test data"), false);
+  assert.equal(canConfirmWorkspaceReset("owner","RESET WORKSPACE",""), false);
 });
 
 test("linked worker history is preserved but does not block an Owner's confirmed test-profile deletion", () => {

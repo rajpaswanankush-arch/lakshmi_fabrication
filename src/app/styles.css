@@ -49,3 +49,51 @@ body{background:var(--canvas);color:var(--ink);font-family:Inter,Arial,sans-seri
 .worker-profile-dialog .profile-transaction-list article>div:first-child{min-width:0}
 .worker-profile-dialog .transaction-reversal{min-width:0;flex-wrap:wrap}
 .welcome-dialog{width:min(420px,calc(100vw - 32px))}.welcome-dialog .welcome-mark{width:62px;height:62px;margin:12px auto 18px;display:grid;place-items:center;border-radius:20px;background:linear-gradient(145deg,#f7e8ec,#fff4df);color:#692038;font-size:28px;animation:welcome-pop .65s cubic-bezier(.2,.9,.25,1.3) both}.welcome-dialog>p{text-align:center;color:#706c68;line-height:1.6}.welcome-dialog>small{display:block;margin-top:10px;text-align:center;color:#8b948d;font-size:10px}@keyframes welcome-pop{from{opacity:0;transform:translateY(10px) scale(.75) rotate(-12deg)}to{opacity:1;transform:translateY(0) scale(1) rotate(0)}}
+
+/* Clear, touch-friendly worker directory */
+.worker-cell{gap:11px}
+.worker-cell b{font-size:13px}
+.worker-cell small{font-size:11px}
+.worker-avatar{width:38px;height:38px;font-size:11px}
+.worker-row td{font-size:12px;padding-top:12px;padding-bottom:12px}
+.worker-actions .table-action{font-size:10px;padding:6px 10px}
+.company-list-card{display:grid;grid-template-columns:minmax(0,1fr);align-items:start}
+.company-open{width:100%;min-height:44px}
+.company-profile-details{display:grid;gap:12px;padding-top:12px;border-top:1px solid var(--line)}
+.company-profile-facts{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:9px}
+.company-profile-facts span{display:grid;gap:3px;min-width:0}
+.company-profile-facts small,.company-site-list small{color:var(--muted);font-size:10px}
+.company-profile-facts b{font-size:12px;overflow-wrap:anywhere}
+.company-profile-facts .company-notes{grid-column:1/-1}
+.company-site-list{display:grid;gap:6px}
+.company-site-list>b{font-size:11px}
+.company-site-list>span{padding:8px;border:1px solid var(--line);border-radius:7px;background:#fff;font-size:11px}
+.company-profile-details .company-actions{justify-content:flex-end;padding-top:9px;border-top:1px solid var(--line)}
+@media(max-width:700px){
+ .worker-table-wrap{overflow:visible}
+ .worker-table-wrap table{display:block;width:100%;min-width:0}
+ .worker-table-wrap thead{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0}
+ .worker-table-wrap tbody{display:grid;gap:10px}
+ .worker-table-wrap tr.worker-row{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:0 12px;padding:10px 12px;border:1px solid var(--line);border-radius:10px;background:#fff}
+ .worker-table-wrap tr.worker-row td{display:block;min-width:0;padding:5px 2px;border:0;background:transparent;font-size:12px}
+ .worker-table-wrap tr.worker-row td:first-child{grid-column:1/-1;padding-bottom:8px}
+ .worker-table-wrap tr.worker-row td:first-child .worker-cell b{font-size:15px}
+ .worker-table-wrap tr.worker-row td:first-child .worker-cell small{font-size:12px}
+ .worker-table-wrap tr.worker-row td:nth-child(2)::before{content:"Labour ID";display:block;margin-bottom:3px;color:var(--muted);font-size:10px}
+ .worker-table-wrap tr.worker-row td:nth-child(3)::before{content:"Role";display:block;margin-bottom:3px;color:var(--muted);font-size:10px}
+ .worker-table-wrap tr.worker-row td:nth-child(4)::before{content:"Agreed wage";display:block;margin-bottom:3px;color:var(--muted);font-size:10px}
+ .worker-table-wrap tr.worker-row td:nth-child(5)::before{content:"Status";display:block;margin-bottom:3px;color:var(--muted);font-size:10px}
+ .worker-table-wrap tr.worker-row td:nth-child(6){display:flex;align-items:flex-end}
+ .worker-table-wrap tr.worker-row td.worker-actions{grid-column:1/-1;display:flex;justify-content:flex-end;gap:8px;padding-top:8px;border-top:1px solid var(--line)}
+ .worker-table-wrap tr.worker-row td.worker-actions::before{content:""}
+ .company-list-card{padding:12px}
+ .company-profile-details .company-actions{justify-content:stretch}
+ .company-profile-details .company-actions button{flex:1;justify-content:center;min-height:38px;font-size:11px}
+}
+@media(max-width:390px){
+ .worker-table-wrap tr.worker-row{padding:9px}
+ .worker-table-wrap tr.worker-row td{font-size:11px}
+ .worker-avatar{width:42px;height:42px}
+}
+
+.workspace-reset-card{margin-top:14px;min-height:0;border-color:#eee2d8;background:#fffdfa}.workspace-reset-card .button{margin-top:4px}.workspace-reset-card p{max-width:760px}
