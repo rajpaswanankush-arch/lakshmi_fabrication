@@ -2,7 +2,46 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { attendanceUnits, initialData, payrollSummary, unpaidMonthlyWages, validateBackup, workerDeletionBlockers, overtimeMonthSummary, upsertAttendance, workerFinancialSummary } from "../src/lib/model";
 import { createBackup, readBackup } from "../src/lib/backup";
+import { buildBackupTables, createExcelBackupBuffer, createPdfBackupBuffer } from "../src/lib/backup-exports";
 import { canConfirmWorkerDeletion, decideRemoteSnapshot, parseWorkspaceWriteResult, resolveInitialWorkspace } from "../src/lib/workspace-sync";
+
+test("report backups include worker, site, attendance, cashbook, and audit records while excluding reversed amounts from totals", () => {
+  const data={...initialData,
+    workers:[{id:"1001",name:"Mantosh Test Worker",phone:"9000000000",role:"Labour" as const,status:"Active" as const,wageType:"Daily" as const,monthlyWage:0,dailyWage:700}],
+    companies:[{id:"co-1",name:"Example Company",phone:"9000000001"}],
+    contracts:[{id:"site-1",company:"Example Company",companyId:"co-1",title:"Workshop",location:"Hyderabad",value:5000,received:1000,status:"Active" as const,instruments:2}],
+    attendance:[{id:"att-1",workerId:"1001",date:"2026-10-01",regularHours:8,overtimeHours:2,status:"P" as const,approvedBy:"Owner"}],
+    ledger:[
+      {id:"receipt-1",date:"2026-10-01",kind:"Receipt" as const,description:"Site advance",amount:1000,contractId:"site-1"},
+      {id:"expense-1",date:"2026-10-02",kind:"Project expense" as const,description:"Materials",amount:250,contractId:"site-1"},
+      {id:"reversal-1",date:"2026-10-03",kind:"Project expense" as const,description:"Reversal: Materials",amount:250,contractId:"site-1",status:"Reversed" as const,reversalOf:"expense-1"},
+    ],
+    auditTrail:[{id:"audit-1",actor:"Owner",action:"added" as const,recordType:"transaction",recordId:"expense-1",occurredAt:"2026-10-02T12:00:00.000Z"}],
+  };
+  const tables=buildBackupTables(data);
+  const byName=new Map(tables.map(table=>[table.name,table]));
+  assert.ok(byName.get("Workers")?.rows.some(row=>row[1]==="Mantosh Test Worker"));
+  assert.ok(byName.get("Sites & contracts")?.rows.some(row=>row[3]==="Workshop"));
+  assert.ok(byName.get("Attendance")?.rows.some(row=>row[0]==="2026-10-01"));
+  assert.equal(byName.get("Cashbook")?.rows.length,3);
+  assert.ok(byName.get("Cashbook")?.rows.some(row=>row[0]==="2026-10-03"&&row[13]==="expense-1"));
+  assert.equal(byName.get("Overview")?.rows.find(row=>row[0]==="Receipts, excluding reversed records (₹)")?.[1],1000);
+  assert.equal(byName.get("Overview")?.rows.find(row=>row[0]==="Cash outflow, excluding reversed records (₹)")?.[1],250);
+  assert.ok(byName.get("Audit history")?.rows.some(row=>row[4]==="expense-1"));
+});
+
+test("Excel and PDF report backups generate readable files", async () => {
+  const data={...initialData,workers:[{id:"1001",name:"Export check",phone:"9000000000",role:"Labour" as const,status:"Active" as const,wageType:"Daily" as const,monthlyWage:0,dailyWage:500}]};
+  const excelBuffer=await createExcelBackupBuffer(data);
+  const ExcelJS=(await import("exceljs")).default;
+  const workbook=new ExcelJS.Workbook();
+  await workbook.xlsx.load(excelBuffer);
+  assert.equal(workbook.getWorksheet("Workers")?.getCell("B2").value,"Export check");
+  assert.ok(workbook.getWorksheet("Cashbook"));
+  const pdfBuffer=await createPdfBackupBuffer(data);
+  assert.equal(new TextDecoder().decode(pdfBuffer.slice(0,5)),"%PDF-");
+  assert.ok(pdfBuffer.byteLength>1000);
+});
 
 test("cloud snapshot replaces an unmarked stale browser cache and retains a recovery copy", () => {
   const cloud={...initialData,workers:[{id:"1001",name:"Cloud worker",phone:"",role:"Labour" as const,status:"Active" as const,wageType:"Monthly" as const,monthlyWage:10000,dailyWage:0}]};
